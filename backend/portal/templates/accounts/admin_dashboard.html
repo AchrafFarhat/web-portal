@@ -1,0 +1,245 @@
+
+{% extends 'accounts/main.html' %}
+
+{% block content %}
+  <style>
+    .sidebar {
+    min-height: calc(100vh - 60px); /* Adjust the height to account for the navbar */
+    width: 250px;
+    background-color: #212529;
+    position: fixed;
+    top: 68px; /* Add a top margin equal to the navbar height */
+    left: 0;
+    z-index: 4;
+    padding-top: 1rem;
+    }
+
+    .sidebar .nav-link {
+      color: rgba(255, 255, 255, 0.75);
+      font-weight: bold;
+      padding: 0.75rem 1rem;
+    }
+
+    .sidebar .nav-link:hover,
+    .sidebar .nav-link:focus {
+      color: white;
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .content-container {
+    margin-left: 250px;
+    margin-top: 60px; /* Add a top margin equal to the navbar height */
+    padding: 2rem;
+    }
+  </style>
+
+
+
+
+  <div class="sidebar">
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="loadUsers()">Users</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="loadGroups()">Groups</a>
+      </li>    
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="loadStreamlitApp()">Reporting Journalier</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#">Reporting Hebdomadaire</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#">Reporting Mensuel</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" onclick="toggleCharts()">Forecasting</a>
+      </li>
+    </ul>
+  </div>
+
+  <div class="container" style="padding-left: 170px;">
+    <div class="row">
+      <div class="col text-center">
+        <h2>Welcome Admin</h2>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-12 data-container"></div>
+    </div>
+    <a href="{% url 'add_user' %}">Add User</a>
+    <iframe id="streamlit-iframe" src="http://localhost:8501" width="100%" height="600" frameborder="0" style="display:none;"></iframe>
+  </div>
+
+
+    <!-- Load Plotly.js and Bootstrap from a CDN -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+  
+    <script>
+
+
+      function loadUsers() {
+          fetch('{% url "get_users" %}')
+              .then(response => response.json())
+              .then(users => {
+                  let usersData = JSON.parse(users);
+                  let usersHtml = '<h3>Users</h3><table class="table table-striped"><thead><tr><th>ID</th><th>Email</th><th>Username</th><th>group</th></tr></thead><tbody>';
+                  usersData.forEach(user => {
+                      usersHtml += `<tr><td>${user.pk}</td><td>${user.email}</td><td>${user.username}</td><td>${user.group_names}</td><td><button onclick="deleteUser(${user.pk})">Delete</button></td></tr>`;
+                  });
+                  usersHtml += '</tbody></table>';
+                  document.querySelector('.data-container').innerHTML = usersHtml;
+              });
+              
+      }
+
+
+
+      function deleteUser(userId) {
+        fetch(`{% url 'delete_user' 0 %}`.replace('0', userId), {
+          method: 'DELETE',
+          headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+          },
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.status === 'success') {
+              loadUsers(); // Reload the users list after deleting a user
+            } else {
+              alert('Error deleting user');
+            }
+          });
+      }
+
+      // Helper function to get a cookie value by name
+      function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+          const cookies = document.cookie.split(';');
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+              break;
+            }
+          }
+        }
+        return cookieValue;
+      }
+
+
+
+
+      function loadGroups() {
+          fetch('{% url "get_groups" %}')
+              .then(response => response.json())
+              .then(groups => {
+                  let groupsData = JSON.parse(groups);
+                  let groupsHtml = '<h3>Groups</h3><table class="table table-striped"><thead><tr><th>ID</th><th>Name</th></tr></thead><tbody>';
+                  groupsData.forEach(group => {
+                      groupsHtml += `<tr><td>${group.pk}</td><td>${group.fields.name}</td></tr>`;
+                  });
+                  groupsHtml += '</tbody></table>';
+                  document.querySelector('.data-container').innerHTML = groupsHtml;
+              });
+      }
+
+
+
+      function loadStreamlitApp() {
+        const iframe = document.getElementById('streamlit-iframe');
+        iframe.style.display = 'block';
+      }
+
+
+
+
+
+
+
+
+      function toggleCharts() {
+        const chartContainer = document.querySelector('.chart-container');
+        chartContainer.style.display = chartContainer.style.display === 'none' ? 'block' : 'none';
+        }
+
+
+      // Prepare user chart data
+      const userLabels = [
+        {% for data_point in user_data %}
+          "{{ data_point.x }}",
+        {% endfor %}
+      ];
+      const userValues = [
+        {% for data_point in user_data %}
+          {{ data_point.y }},
+        {% endfor %}
+      ];
+      const userForecastValues = [
+        {% for data_point in user_forecast %}
+          {{ data_point.y }},
+        {% endfor %}
+      ];
+  
+      // Prepare traffic chart data
+      const trafficLabels = [
+        {% for data_point in traffic_data %}
+          "{{ data_point.x }}",
+        {% endfor %}
+      ];
+      const trafficValues = [
+        {% for data_point in traffic_data %}
+          {{ data_point.y }},
+        {% endfor %}
+      ];
+      const trafficForecastValues = [
+        {% for data_point in traffic_forecast %}
+          {{ data_point.y }},
+        {% endfor %}
+      ];
+  
+      // Create the user chart
+      const userChart = {
+        x: userLabels,
+        y: userValues,
+        name: 'Users',
+        type: 'bar',
+        marker: { color: 'rgba(0, 123, 255, 0.7)' }
+      };
+  
+      const userForecastChart = {
+        x: userLabels,
+        y: userForecastValues,
+        name: 'Forecasted Users',
+        type: 'bar',
+        marker: { color: 'rgba(255, 132, 0, 0.7)' }
+      };
+  
+      Plotly.newPlot('userChart', [userChart, userForecastChart]);
+  
+      // Create the traffic chart
+      const trafficChart = {
+        x: trafficLabels,
+        y: trafficValues,
+        name: 'Traffic',
+        type: 'bar',
+        marker: { color: 'rgba(0, 123, 255, 0.7)' }
+      };
+  
+      const trafficForecastChart = {
+        x: trafficLabels,
+        y: trafficForecastValues,
+        name: 'Forecasted Traffic',
+        type: 'bar',
+        marker: { color: 'rgba(255, 132, 0, 0.7)' }
+      };
+  
+      Plotly.newPlot('trafficChart', [trafficChart, trafficForecastChart]);
+    </script>
+  
+  
+{% endblock %}
