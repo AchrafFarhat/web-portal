@@ -54,7 +54,7 @@
         <a class="nav-link" href="#" onclick="loadStreamlitApp()">Reporting</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="#" onclick="toggleCharts()">Forecasting</a>
+        <a class="nav-link" href="#" onclick="loadForecastingApp()">Forecasting</a>
       </li>
     </ul>
   </div>
@@ -72,6 +72,7 @@
       <div class="col-md-12 data-container"></div>
     </div>
     <iframe id="streamlit-iframe" src="http://localhost:8501" width="115%" height="1500" frameborder="1" style="display:none;"></iframe>
+    <iframe id="streamlit-iframe1" src="http://localhost:8502" width="115%" height="1500" frameborder="1" style="display:none;"></iframe>
   </div>
 
 
@@ -226,6 +227,16 @@ function editUser(userId) {
         const iframe = document.getElementById('streamlit-iframe');
         iframe.style.display = 'block';
       }
+
+
+      function loadForecastingApp() {
+        // Hide the user information
+        document.querySelector('.data-container').innerHTML = '';
+        hideUsersWelcome();
+        const iframe = document.getElementById('streamlit-iframe1');
+        iframe.style.display = 'block';
+      }
+
 
 
 

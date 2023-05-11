@@ -1,94 +1,90 @@
-import os
-import io
-import pandas as pd
 import streamlit as st
+import pandas as pd
 import numpy as np
-import tensorflow as tf
-from tensorflow.python.keras.models import load_model
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
+import os
 import joblib
 from keras.models import load_model
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
-# Mapping of full region names to their abbreviations
-region_mapping = {
-    "Ariana": "ARI",
-    "Ben Arous": "BAR",
-    "Beja": "BEJ",
-    "Bizerte": "BIZ",
-    "Gabes": "GAB",
-    "Gafsa": "GAF",
-    "Jendouba": "JEN",
-    "Kairaouane": "KAI",
-    "Kasserine": "KAS",
-    "Kebeli": "KEB",
-    "Kef": "KEF",
-    "Mahdia": "MAH",
-    "Manouba": "MAN",
-    "Medenine": "MED",
-    "Monastir": "MON",
-    "Nabeul": "NAB",
-    "Sidi Bouzid": "SBO",
-    "Sfax": "SFA",
-    "Siliana": "SIL",
-    "Sousse": "SOU",
-    "Tataouine": "TAT",
-    "Tozeur": "TOZ",
-    "Tunis": "TUN",
-    "Zaghouane": "ZAG",
+# Load models and scalers
+model_users = load_model('models/lstm_model_ARI_users.h5')
+model_traffic = load_model('models/lstm_model_ARI_traffic.h5')
+scaler_users = joblib.load('models/scaler_ARI_users(1).gz')
+scaler_traffic = joblib.load('models/scaler_ARI_traffic(1).gz')
 
-    # Add the remaining regions here
-}
+# Function to create sequences
+def create_sequences(data, seq_length):
+    xs = []
+    ys = []
 
-csv_file = "BEJ_data.csv"
-csv_folder = "csv_data"
-os.path.join(csv_folder, csv_file)
-dataframe = pd.read_csv(os.path.join(csv_folder, csv_file), usecols=[13], engine="python", skipfooter=3)
-dataset = dataframe.values.astype("float32")
-    # Replace these paths with the actual paths of the files on your system
-model_path = "models/ARI_data_model.h5"
-scaler_path = "models/scaler.pkl"
+    for i in range(len(data)-seq_length-1):
+        x = data[i:(i+seq_length)]
+        y = data[i+seq_length]
+        xs.append(x)
+        ys.append(y)
 
+    return np.array(xs), np.array(ys)
 
-# Load the pre-trained model and scaler
-model = load_model(model_path)
-scaler = joblib.load(scaler_path)
+# Load CSV data
+@st.cache_data
+def load_data():
+    return pd.read_csv('csv_data/ARI_data.csv')
 
+df = load_data()
 
-# Sidebar for model parameters
-st.sidebar.header("Model Parameters")
-look_back = st.sidebar.slider("Look Back", 1, 20, 12)
-epochs = st.sidebar.slider("Epochs", 10, 200, 100)
-batch_size = st.sidebar.slider("Batch Size", 1, 10, 1)
+base_stations = df["eNodeB Name"].unique()
+selected_base_station = st.sidebar.selectbox("Choose a base station", base_stations)
+    
+cells = df[df["eNodeB Name"] == selected_base_station]["Cell Name"].unique()
+selected_cell = st.sidebar.selectbox("Choose a cell", cells)
 
-    # Prepare the data for the LSTM model
-def prepare_data(data, look_back):
-    X, y = [], []
-    for i in range(len(data) - look_back - 1):
-        X.append(data[i : i + look_back, 0])
-        y.append(data[i + look_back, 0])
-    return np.array(X), np.array(y)
+neurons = st.sidebar.slider("Select number of neurons", 10, 100, step=10)
+epochs = st.sidebar.slider("Select number of epochs", 5, 100, step=5)
+batch_size = st.sidebar.slider("Select batch size", 1, 20, step=1)
 
-    # Normalize the dataset
-dataset = scaler.transform(dataset)
-X, y = prepare_data(dataset, look_back)
-X = np.reshape(X, (X.shape[0], X.shape[1], 1))
+filtered_data = df[(df["eNodeB Name"] == selected_base_station) & (df["Cell Name"] == selected_cell)]
 
-    # Retrain the model based on selected hyperparameters
-if st.button("Retrain Model"):
-    model.fit(X, y, epochs=epochs, batch_size=batch_size, verbose=2)
+seq_length = 7
 
-    # Make predictions
-predictions = model.predict(X)
+# Create sequences and make predictions
+X_users, _ = create_sequences(filtered_data["FT_AVERAGE NB OF USERS (UEs RRC CONNECTED)"].values, seq_length)
+X_traffic, _ = create_sequences(filtered_data["FT_4G/LTE DL TRAFFIC VOLUME (GBYTES)"].values, seq_length)
 
-    # Invert predictions and target values to the original scale
-predictions = scaler.inverse_transform(predictions)
-y_original = scaler.inverse_transform([y])
+last_sequence_users = np.array([X_users[-1]])
+last_sequence_traffic = np.array([X_traffic[-1]])
 
-    # Plot original and predicted values
-plt.figure(figsize=(8, 6))
-plt.plot(y_original[0], label="Original values")
-plt.plot(predictions[:, 0], label="Predicted values")
-plt.legend()
-st.pyplot(plt)
+# Reshape sequences to 2D before scaling
+last_sequence_users_scaled = scaler_users.transform(last_sequence_users.reshape(-1, 1))
+last_sequence_traffic_scaled = scaler_users.transform(last_sequence_traffic.reshape(-1, 1))
+
+prediction_users_scaled = model_users.predict(last_sequence_users_scaled[np.newaxis, :, :])
+prediction_traffic_scaled = model_traffic.predict(last_sequence_traffic_scaled[np.newaxis, :, :])
+
+prediction_users = scaler_users.inverse_transform(prediction_users_scaled)
+prediction_traffic = scaler_users.inverse_transform(prediction_traffic_scaled)
+
+# Create time sequences for plotting
+time_seq_users = np.append(filtered_data["Time"].values[seq_length:], 'next')
+time_seq_traffic = np.append(filtered_data["Time"].values[seq_length:], 'next')
+
+# Add the real values and the predicted value to create sequences for plotting
+plot_values_users = np.append(filtered_data["FT_AVERAGE NB OF USERS (UEs RRC CONNECTED)"].values[seq_length:], prediction_users)
+plot_values_traffic = np.append(filtered_data["FT_4G/LTE DL TRAFFIC VOLUME (GBYTES)"].values[seq_length:], prediction_traffic)
+
+# Create a line chart for FT_AVERAGE_NB_OF_USERS
+fig_users = go.Figure()
+fig_users.add_trace(go.Scatter(x=time_seq_users[:-1], y=plot_values_users[:-1], mode='lines', name='Number of Users'))
+fig_users.add_trace(go.Scatter(x=time_seq_users[-2:], y=plot_values_users[-2:], mode='lines', name='Predicted Number of Users', line=dict(color='orange')))
+
+fig_users.update_layout(title="Average Number of Users (Forecasted)")
+
+st.plotly_chart(fig_users)
+
+# Create a line chart for FT_4G/LTE DL TRAFFIC VOLUME (GBYTES)
+fig_traffic = go.Figure()
+fig_traffic.add_trace(go.Scatter(x=time_seq_traffic[:-1], y=plot_values_traffic[:-1], mode='lines', name='Traffic Volume'))
+fig_traffic.add_trace(go.Scatter(x=time_seq_traffic[-2:], y=plot_values_traffic[-2:], mode='lines', name='Predicted Traffic Volume', line=dict(color='orange')))
+
+fig_traffic.update_layout(title="4G LTE Downlink Traffic Volume (GBYTES) (Forecasted)")
+
+st.plotly_chart(fig_traffic)
