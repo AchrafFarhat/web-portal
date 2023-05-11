@@ -2,6 +2,12 @@
 {% extends 'accounts/main.html' %}
 
 {% block content %}
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+
   <style>
     .sidebar {
     min-height: calc(100vh - 60px); /* Adjust the height to account for the navbar */
@@ -45,13 +51,7 @@
         <a class="nav-link" href="#" onclick="loadGroups()">Groups</a>
       </li>    
       <li class="nav-item">
-        <a class="nav-link" href="#" onclick="loadStreamlitApp()">Reporting Journalier</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="#">Reporting Hebdomadaire</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="#">Reporting Mensuel</a>
+        <a class="nav-link" href="#" onclick="loadStreamlitApp()">Reporting</a>
       </li>
       <li class="nav-item">
         <a class="nav-link" href="#" onclick="toggleCharts()">Forecasting</a>
@@ -59,17 +59,19 @@
     </ul>
   </div>
 
-  <div class="container" style="padding-left: 170px;">
-    <div class="row">
-      <div class="col text-center">
-        <h2>Welcome Admin</h2>
+  <div class="container" style="padding-left: 137px; padding-right: 30px; margin-top: 0px;">
+    <div id="users-welcome" style="display:none;">
+      <div class="row">
+        <div class="col text-center">
+          
+          <img src="https://managers.tn/wp-content/uploads/2020/03/image001.png" alt="Your image description" style="width: 115%; height: 600;">
+        </div>
       </div>
     </div>
     <div class="row">
       <div class="col-md-12 data-container"></div>
     </div>
-    <a href="{% url 'add_user' %}">Add User</a>
-    <iframe id="streamlit-iframe" src="http://localhost:8501" width="100%" height="600" frameborder="0" style="display:none;"></iframe>
+    <iframe id="streamlit-iframe" src="http://localhost:8501" width="115%" height="1500" frameborder="1" style="display:none;"></iframe>
   </div>
 
 
@@ -80,20 +82,68 @@
   
     <script>
 
+document.getElementById('users-welcome').style.display = 'block';
 
-      function loadUsers() {
-          fetch('{% url "get_users" %}')
-              .then(response => response.json())
-              .then(users => {
-                  let usersData = JSON.parse(users);
-                  let usersHtml = '<h3>Users</h3><table class="table table-striped"><thead><tr><th>ID</th><th>Email</th><th>Username</th><th>group</th></tr></thead><tbody>';
-                  usersData.forEach(user => {
-                      usersHtml += `<tr><td>${user.pk}</td><td>${user.email}</td><td>${user.username}</td><td>${user.group_names}</td><td><button onclick="deleteUser(${user.pk})">Delete</button></td></tr>`;
-                  });
-                  usersHtml += '</tbody></table>';
-                  document.querySelector('.data-container').innerHTML = usersHtml;
-              });
-              
+
+
+
+function loadUsers() {
+  // Hide the Streamlit app iframe
+  document.getElementById('streamlit-iframe').style.display = 'none';
+  // Hide the users-welcome div
+  hideUsersWelcome();
+  fetch('{% url "get_users" %}')
+    .then(response => response.json())
+    .then(users => {
+      let usersData = JSON.parse(users);
+      let usersHtml = `
+        <div class="d-flex justify-content-between align-items-center">
+          <h3>Users Informations</h3>
+          <a href="{% url 'add_user' %}" class="btn btn-primary">Add User</a>
+        </div>
+        <table class="table table-hover table-bordered">
+          <thead class="table-primary">
+            <tr>
+              <th>ID</th>
+              <th>Email</th>
+              <th>Username</th>
+              <th>group</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>`;
+      usersData.forEach(user => {
+        usersHtml += `
+          <tr>
+            <td>${user.pk}</td>
+            <td>${user.email}</td>
+            <td>${user.username}</td>
+            <td>${user.group_names}</td>
+            <td>
+              <button onclick="editUser(${user.pk})" class="btn btn-warning">Edit</button>
+              <button onclick="deleteUser(${user.pk})" class="btn btn-danger">Delete</button>
+            </td>
+          </tr>`;
+      });
+      usersHtml += `
+          </tbody>
+        </table>`;
+      document.querySelector('.data-container').innerHTML = usersHtml;
+    });
+}
+
+
+
+
+function editUser(userId) {
+    window.location.href = `{% url 'edit_user' 0 %}`.replace('0', userId);
+}
+
+
+
+      function hideUsersWelcome() {
+      // Hide the users-welcome div
+      document.getElementById('users-welcome').style.display = 'none';
       }
 
 
@@ -135,22 +185,44 @@
 
 
       function loadGroups() {
-          fetch('{% url "get_groups" %}')
-              .then(response => response.json())
-              .then(groups => {
-                  let groupsData = JSON.parse(groups);
-                  let groupsHtml = '<h3>Groups</h3><table class="table table-striped"><thead><tr><th>ID</th><th>Name</th></tr></thead><tbody>';
-                  groupsData.forEach(group => {
-                      groupsHtml += `<tr><td>${group.pk}</td><td>${group.fields.name}</td></tr>`;
-                  });
-                  groupsHtml += '</tbody></table>';
-                  document.querySelector('.data-container').innerHTML = groupsHtml;
-              });
-      }
+  // Hide the Streamlit app iframe
+  document.getElementById('streamlit-iframe').style.display = 'none';
+  hideUsersWelcome();
+  fetch('{% url "get_groups" %}')
+    .then(response => response.json())
+    .then(groups => {
+      let groupsData = JSON.parse(groups);
+      let groupsHtml = `
+        <h3>Groups</h3>
+        <table class="table table-hover table-bordered">
+          <thead class="table-primary">
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+            </tr>
+          </thead>
+          <tbody>`;
+      groupsData.forEach(group => {
+        groupsHtml += `
+          <tr>
+            <td>${group.pk}</td>
+            <td>${group.fields.name}</td>
+          </tr>`;
+      });
+      groupsHtml += `
+          </tbody>
+        </table>`;
+      document.querySelector('.data-container').innerHTML = groupsHtml;
+    });
+}
+
 
 
 
       function loadStreamlitApp() {
+        // Hide the user information
+        document.querySelector('.data-container').innerHTML = '';
+        hideUsersWelcome();
         const iframe = document.getElementById('streamlit-iframe');
         iframe.style.display = 'block';
       }
@@ -162,83 +234,7 @@
 
 
 
-      function toggleCharts() {
-        const chartContainer = document.querySelector('.chart-container');
-        chartContainer.style.display = chartContainer.style.display === 'none' ? 'block' : 'none';
-        }
-
-
-      // Prepare user chart data
-      const userLabels = [
-        {% for data_point in user_data %}
-          "{{ data_point.x }}",
-        {% endfor %}
-      ];
-      const userValues = [
-        {% for data_point in user_data %}
-          {{ data_point.y }},
-        {% endfor %}
-      ];
-      const userForecastValues = [
-        {% for data_point in user_forecast %}
-          {{ data_point.y }},
-        {% endfor %}
-      ];
-  
-      // Prepare traffic chart data
-      const trafficLabels = [
-        {% for data_point in traffic_data %}
-          "{{ data_point.x }}",
-        {% endfor %}
-      ];
-      const trafficValues = [
-        {% for data_point in traffic_data %}
-          {{ data_point.y }},
-        {% endfor %}
-      ];
-      const trafficForecastValues = [
-        {% for data_point in traffic_forecast %}
-          {{ data_point.y }},
-        {% endfor %}
-      ];
-  
-      // Create the user chart
-      const userChart = {
-        x: userLabels,
-        y: userValues,
-        name: 'Users',
-        type: 'bar',
-        marker: { color: 'rgba(0, 123, 255, 0.7)' }
-      };
-  
-      const userForecastChart = {
-        x: userLabels,
-        y: userForecastValues,
-        name: 'Forecasted Users',
-        type: 'bar',
-        marker: { color: 'rgba(255, 132, 0, 0.7)' }
-      };
-  
-      Plotly.newPlot('userChart', [userChart, userForecastChart]);
-  
-      // Create the traffic chart
-      const trafficChart = {
-        x: trafficLabels,
-        y: trafficValues,
-        name: 'Traffic',
-        type: 'bar',
-        marker: { color: 'rgba(0, 123, 255, 0.7)' }
-      };
-  
-      const trafficForecastChart = {
-        x: trafficLabels,
-        y: trafficForecastValues,
-        name: 'Forecasted Traffic',
-        type: 'bar',
-        marker: { color: 'rgba(255, 132, 0, 0.7)' }
-      };
-  
-      Plotly.newPlot('trafficChart', [trafficChart, trafficForecastChart]);
+      
     </script>
   
   

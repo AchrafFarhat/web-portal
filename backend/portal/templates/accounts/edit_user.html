@@ -1,0 +1,10 @@
+{% extends 'accounts/main.html' %}
+
+{% block content %}
+  <h1>Edit User</h1>
+  <form method="POST" action="{% url 'edit_user' user.pk %}">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save Changes</button>
+  </form>
+{% endblock %}

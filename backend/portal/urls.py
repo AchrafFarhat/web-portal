@@ -15,5 +15,6 @@ urlpatterns = [
     path('add_user/', views.add_user, name='add_user'),
     path('delete_user/<int:user_id>/', views.delete_user, name='delete_user'),
     path('cell_data/', views.cell_data, name='cell_data'),
+    path('edit_user/<int:user_id>/', views.edit_user, name='edit_user'),
     #path('forecasting/dashboard/', views.forecasting_view, name='forecasting'),
 ]

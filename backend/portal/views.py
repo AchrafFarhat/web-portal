@@ -7,7 +7,7 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.cache import cache
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_protect
@@ -22,8 +22,10 @@ from django.core import serializers
 from .models import CustomUser
 from .models import CellData
 # Local imports
-from .forms import CustomUserCreationForm, LoginForm
+from .forms import CustomUserCreationForm, LoginForm, CustomUserEditForm
 from datetime import datetime, timedelta
+
+
 
 ###
 import tensorflow as tf
@@ -42,6 +44,8 @@ def cell_data(request):
     data = CellData.objects.filter(Time__range=(start_date, end_date)).values('Time', 'FT_AVERAGE_NB_OF_USERS', 'FT_4G_LTE_DL_TRAFFIC_VOLUME')
     response_data = list(data)
     return JsonResponse(response_data, safe=False)
+
+
 
 
 
@@ -78,6 +82,25 @@ def delete_user(request, user_id):
         return JsonResponse({'status': 'error'})
 
 
+
+
+
+def edit_user(request, user_id):
+    if not request.user.is_admin:
+        return JsonResponse({"error": "Permission denied"}, status=403)
+
+    user = CustomUser.objects.get(id=user_id)
+
+    if request.method == 'POST':
+        form = CustomUserEditForm(request.POST, instance=user)
+        if form.is_valid():
+            user = form.save()
+            messages.success(request, f'User {user.username} updated successfully!')
+            return redirect('admin_dashboard')
+    else:
+        form = CustomUserEditForm(instance=user)  # Populate the form with the user's data
+
+    return render(request, 'accounts/edit_user.html', {'form': form})
 
 
 

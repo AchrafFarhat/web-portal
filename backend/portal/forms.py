@@ -29,3 +29,9 @@ class CellDataForm(forms.ModelForm):
     class Meta:
         model = CellData
         fields = ['Time']
+
+
+class CustomUserEditForm(forms.ModelForm):
+    class Meta:
+        model = CustomUser
+        fields = ['email', 'username','groups']
